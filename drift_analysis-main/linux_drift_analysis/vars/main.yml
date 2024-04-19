@@ -1,0 +1,17 @@
+---
+# vars file for linux_drift_analysis
+desired_macs:
+  - "hmac-sha2-256-etm@openssh.com"
+  - "umac-128-etm@openssh.com"
+  - "hmac-sha2-512-etm@openssh.com"
+  - "hmac-sha2-256"
+  - "umac-128@openssh.com"
+  - "hmac-sha2-512"
+services_to_check:
+  - atd
+  - cups
+  - named
+  - bind
+  - dhcpd
+  - xwindows
+  - vnc

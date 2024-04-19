@@ -1,0 +1,80 @@
+- name: Set non-root partitions command to find files and directories
+  set_fact:
+     nonrootpartitions_command: >
+       find / \( -path '/tmp' -o -path '/var/run/rpc_door' -o -path '/var/spool/uucppublic' -o -path '/var/spool/uucppublic' -o
+       -path '/dev/shm' -o -path '/var/run' -o -path '/var/tmp' -o -path '/usr/tmp' -o -path '/dev/mqueue' -o -path '/run/systemd/private' -o -path '/run/systemd/notify' -o
+       -path '/opt/bmc/bladelogic/RSCD/Transactions' -o -path '/opt/bmc/bladelogic/RSCD/Transactions/Database' -o
+       -path '/opt/bmc/bladelogic/RSCD/Transactions/events' -o -path '/opt/bmc/bladelogic/RSCD/Transactions/events/locks' -o
+       -path '/opt/bmc/bladelogic/RSCD/Transactions/events/locks/reader' -o
+       -path '/opt/bmc/bladelogic/RSCD/Transactions/locks' -o
+       -path '/opt/bmc/bladelogic/RSCD/Transactions/locks/reader' -o
+       -path '/opt/bmc/bladelogic/RSCD/Transactions/log' -o
+       -path '/opt/bmc/bladelogic/RSCD/Transactions/log/tmp' \) -prune -o -perm -o=rwx \! -type l -print
+- name: Execute non-root partitions command
+  command: "{{ nonrootpartitions_command }}"
+  register: nonrootpartitions_output
+  ignore_errors: true
+
+- name: Display non-root partitions
+  debug:
+    var: nonrootpartitions_output.stdout_lines
+
+- name: Display non-root partitions
+  debug:
+    msg: No files found with World writeable permissions
+  when: nonrootpartitions_output.stdout_lines is not defined or nonrootpartitions_output.stdout_lines == []
+
+- name: Set task name
+  set_fact:
+    task_name: "WRITE-ABLE files/directories"
+
+- name: Set drift status if drifted
+  set_fact:
+    drift_status: "Non-compliant"
+  when: nonrootpartitions_output.stdout_lines | length > 0
+
+- name: Set drift status if not drifted
+  set_fact:
+    drift_status: "Compliant"
+  when: nonrootpartitions_output.stdout_lines is not defined or nonrootpartitions_output.stdout_lines == []
+
+- name: Print the output if drift status is settled
+  set_fact:
+    output: "No files found with other user writeable permissions"
+  when: nonrootpartitions_output.stdout_lines is not defined or nonrootpartitions_output.stdout_lines == []
+
+- name: Writing Actual Value
+  set_fact:
+    actual_value: "There should be no WORLD WRITE-ABLE files/directories other than 
+/var/tmp, 
+/usr/tmp, 
+/tmp, 
+/var/run/rpc_door, 
+/var/spool/uucppublic, 
+/dev/shm/, 
+Authentication ,
+/opt/bmc/bladelogic/RSCD/Transactions, 
+/opt/bmc/bladelogic/RSCD/Transactions/Database, 
+/opt/bmc/bladelogic/RSCD/Transactions/events,
+/opt/bmc/bladelogic/RSCD/Transactions/events/locks, 
+/opt/bmc/bladelogic/RSCD/Transactions/events/locks/reader, 
+/opt/bmc/bladelogic/RSCD/Transactions/locks, 
+/opt/bmc/bladelogic/RSCD/Transactions/locks/reader, 
+/opt/bmc/bladelogic/RSCD/Transactions/log, 
+/opt/bmc/bladelogic/RSCD/Transactions/log/tmp"
+
+- name: Get host IP
+  set_fact:
+    host_ip: "{{ ansible_host | default(inventory_hostname) }}"
+
+- name: CSV - Write information into .csv file
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+    line: "{{task_name}},{{host_ip}},{{drift_status}},\"{{nonrootpartitions_output.stdout_lines |regex_replace(',', '\n')}}\",\"{{actual_value}}\""
+  when: nonrootpartitions_output.stdout_lines | length > 0
+
+- name: CSV - Write information into .csv file if no output produced
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+    line: "{{task_name}},{{host_ip}},{{drift_status}},{{ output }},\"{{actual_value}}\""
+  when: nonrootpartitions_output.stdout_lines is not defined or nonrootpartitions_output.stdout_lines == []

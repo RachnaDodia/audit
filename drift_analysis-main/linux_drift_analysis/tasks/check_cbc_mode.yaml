@@ -1,0 +1,41 @@
+---
+- name: Read SSHD configuration file
+  slurp:
+    path: /etc/ssh/sshd_config
+  register: sshd_config_content
+
+- name: Check if any of the desired MACs configurations exist
+  set_fact:
+    macs_exist: "{{ desired_macs | select('in', sshd_config_content['content'] | b64decode | regex_replace('\\r\\n', '\\n')) | list }}"
+
+- name: Set compliance status fact
+  set_fact:
+     compliance_status: "{{ 'Compliant' if macs_exist else 'Non-compliant' }}"
+
+- name: Set task name
+  set_fact:
+    task_name: "Disable CBC mode ciphers and weak MAC algorithms(MD5 and - 96), add the following lines into the / etc / ssh / sshd_config file."
+
+- name: Print the output if drift status is settled
+  set_fact:
+    output: "CBC mode ciphers and weak MAC algorithms(MD5 and - 96) is Disabled"
+  when: compliance_status == 'Compliant'
+
+- name: Print the output if drift status is settled
+  set_fact:
+    output: " MACs doesn't satisfy the criteria"
+  when: compliance_status == 'Non-compliant'
+
+- name: Writing Actual Value
+  set_fact:
+    actual_value: "following line should be present in the /etc/ssh/sshd_config file.\n MACs=hmac-sha2-256-etm@openssh.com,umac-128- etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,umac-128@openssh.com,hmac-sha2-512"
+
+- name: Get host IP
+  set_fact:
+    host_ip: "{{ ansible_host | default(inventory_hostname) }}"
+
+- name: CSV - Write information into .csv file if no output produced
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime | default('unknown_datetime') }}.csv"
+    line: "\"{{ task_name }}\",\"{{ host_ip }}\",\"{{ compliance_status }}\",\"{{ output }}\",\"{{ actual_value }}\""
+

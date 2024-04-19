@@ -1,0 +1,54 @@
+---
+- name: Find files and directories owned by non-existent users
+  shell: find / -nouser 2> /dev/null | sed 's/\&/\&\&/g'
+  register: find_result
+  changed_when: false
+
+- name: Display escaped output
+  debug:
+    msg: "{{ find_result.stdout_lines }}"
+  when: find_result.stdout_lines | length > 0
+
+- name: Display escaped output
+  debug:
+    msg: "There are no files available with none users and none group"
+  when: find_result.stdout_lines is not defined or find_result.stdout_lines == []
+
+- name: Set task name
+  set_fact:
+    task_name: "Files with Owner/User"
+
+- name: Set drift status if drifted
+  set_fact:
+    drift_status: "Non-compliant"
+  when: find_result.stdout_lines | length > 0
+
+- name: Set drift status if not drifted
+  set_fact:
+    drift_status: "Compliant"
+  when: find_result.stdout_lines is not defined or find_result.stdout_lines == []
+
+- name: Print the output if drift status is settled
+  set_fact:
+    output: "There are no files available with none users and none group"
+  when: find_result.stdout_lines is not defined or find_result.stdout_lines == []
+
+- name: Writing Actual Value
+  set_fact:
+    actual_value: "Ensure that there should be no files that have No owner/user."
+
+- name: Get host IP
+  set_fact:
+    host_ip: "{{ ansible_host | default(inventory_hostname) }}"
+
+- name: CSV - Write information into .csv file
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+    line: "{{task_name}},{{host_ip}},{{drift_status}},\"{{find_result.stdout_lines |regex_replace(',', '\n')}}\",{{actual_value}}"
+  when: find_result.stdout_lines | length > 0
+
+- name: CSV - Write information into .csv file if no output produced
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+    line: "{{task_name}},{{host_ip}},{{drift_status}},{{ output }},{{actual_value}}"
+  when: find_result.stdout_lines is not defined or find_result.stdout_lines == []

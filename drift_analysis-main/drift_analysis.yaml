@@ -1,0 +1,48 @@
+---
+- name: Drift analysis playbook
+  hosts: all
+  become: true
+  gather_facts: no
+  serial: 1
+  tasks:   
+
+    - name: Get current date and time
+      set_fact:
+        current_datetime: "{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+
+    - name: Create file with current date and time
+      file:
+        path: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+        state: touch 
+
+    - name: CSV - Create file and set the header
+      lineinfile:
+        dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+        line: Title,Host IP,Drift Status,Current Value,Actual Value
+        create: yes
+        state: present
+
+    - name: import role to find no user file and directory 
+      import_role:
+        name: linux_drift_analysis
+        tasks_from: files_with_no_owner.yaml 
+
+    - name: import role to find files and directories with SUID and GUID permission
+      import_role:
+        name: linux_drift_analysis
+        tasks_from: files_with_suid_sguid.yaml 
+
+    - name: import role to find writeble files and directories for other user
+      import_role:
+        name: linux_drift_analysis
+        tasks_from: find_writable_directories_files.yaml
+
+    - name: import role to find writeble files and directories for other user
+      import_role:
+        name: linux_drift_analysis
+        tasks_from: check_cbc_mode.yaml
+
+    - name: import role to check unwanted services
+      import_role:
+        name: linux_drift_analysis
+        tasks_from: check_service_status.yaml

@@ -1,0 +1,116 @@
+- name: There should be no files with SUID or SGID bit set other than below excluded files
+  shell: |
+    find / \
+       -path '/bin' -prune -o \
+       -path '/sbin' -prune -o \
+       -path '/lib' -prune -o \
+       -path '/run' -prune -o \
+       -path '/usr' -prune -o \
+       -path '/dbhome*' -prune -o \
+       -path '/DBHOME*' -prune -o \
+       -path '/oem*' -prune -o \
+       -path '/OEM*' -prune -o \
+       -path '/grid*' -prune -o \
+       -path '/GRID*' -prune -o \
+       -path '/ora*' -prune -o \
+       -path '/sapmnt/P11/profile' -prune -o \
+       -path '/sapmnt/P11/exe' -prune -o \
+       -path '/sapmnt/P11/global' -prune -o \
+       -path '/usr/sap/trans' -prune -o \
+       -path '/sasinst/sashome/SASFoundation/9.4/utilities/bin/sasperm' -prune -o \
+       -path '/usr/sap/P11/REMATM' -prune -o \
+       -path '/bdc' -prune -o \
+       -path '/sas/sas93/sasinst/SASFoundation/9.3/utilities/bin/sasauth' -prune -o \
+       -path '/sas/sas93/sasinst/SASFoundation/9.3/utilities/bin/sasperm' -prune -o \
+       -path '/sas/sas93/sasinst/SASFoundation/9.3/utilities/bin/elssrv' -prune -o \
+       -path '/hadoop/hadoop/sashadoop/hadoop-2.4.0/bin/container-executor' -prune -o \
+       -path '/sapmnt/P11/exe' -prune -o \
+       -path '/oem13csys/oracle/agent13c/agent_13.2.0.0.0/bin/emtgtctl2' -prune -o \
+       -path '/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmtgtctl2' -prune -o \
+       -path '/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmb' -prune -o \
+       -path '/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmhs' -prune -o \
+       -path '/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmo' -prune -o \
+       -path '/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmr' -prune -o \
+       -path '/opt/bmc/bladelogic/RSCD/bin/lsof' -prune -o \
+       -path '/opt/bmc/bladelogic/RSCD/nativetool/bin/.mcsiwrapper' -prune -o \
+       -path '/DBHOME/oracle/app/product/12.1.0.2/dbhome_1/bin/oracle' -prune -o \
+       -path '/GRIDHOME/oracle/app/product/grid/12.1.0.2/bin/oracle' -prune -o \
+       -path '/opt/Symantec/sdcssagent' -prune -o \
+       -path '/var/log/sdcsslog' -purne -o \
+       -path '/var/symantec/sep' -purne -o \
+       -path '/etc/symantec/sep' -purne -o \
+       -path '/var/log/sdcss-caflog'-purne -o \
+        \( -perm -02000 -o -perm -04000 \) -print | tr ',' '\n'
+  register: found_files
+  ignore_errors: true
+
+- name: Display found files
+  debug:
+    var: found_files.stdout_lines
+- name: Display found files
+  debug:
+    msg: "No files found with SUID and SGID"
+  when: found_files.stdout_lines is not defined or found_files.stdout_lines == []
+- name: Set task name
+  set_fact:
+    task_name: "SUID or SGID bit set files"
+
+- name: Set drift status if drifted
+  set_fact:
+    drift_status: "Non-compliant"
+  when: found_files.stdout_lines | length > 0
+
+- name: Set drift status if not drifted
+  set_fact:
+    drift_status: "Compliant"
+  when: found_files.stdout_lines is not defined or found_files.stdout_lines == []
+
+- name: Print the output if drift status is settled
+  set_fact:
+    output: "No files found with SUID and SGID"
+  when: found_files.stdout_lines is not defined or found_files.stdout_lines == []
+
+- name: Writing Actual Value
+  set_fact:
+    actual_value: "There should be no files with SUID or SGID bit set other than 
+/bin,
+/sbin, 
+/lib, 
+/usr, 
+/ora, 
+/sapmnt/P11/profile, 
+/sapmnt/P11/exe, 
+/sapmnt/P11/global, 
+/usr/sap/trans, 
+/sasinst/sashome/SASFoundation/9.4/utilities/bin/sasperm, 
+/usr/sap/P11/REMATM, 
+/bdc, 
+/sas/sas93/sasinst/SASFoundation/9.3/utilities/bin/sasauth, 
+/sas/sas93/sasinst/SASFoundation/9.3/utilities/bin/sasperm, 
+/sas/sas93/sasinst/SASFoundation/9.3/utilities/bin/elssrv, 
+/hadoop/hadoop/sashadoop/hadoop-2.4.0/bin/container-executor,
+/sapmnt/P11/exe,
+/oem13csys/oracle/agent13c/agent_13.2.0.0.0/bin/emtgtctl2,
+/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmb,
+/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmhs,
+/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmo,
+/oem13csys/oracle/agent13c/agent_13.2.0.0.0/sbin/nmr,
+/opt/bmc/bladelogic/RSCD/bin/lsof, 
+/opt/bmc/bladelogic/RSCD/nativetool/bin/.mcsiwrapper,
+/DBHOME/oracle/app/product/12.1.0.2/dbhome_1/bin/oracle,
+/GRIDHOME/oracle/app/product/grid/12.1.0.2/bin/oracle"
+
+- name: Get host IP
+  set_fact:
+    host_ip: "{{ ansible_host | default(inventory_hostname) }}"
+- name: CSV - Write information into .csv file
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+    line: "{{task_name}},{{host_ip}},{{drift_status}},\"{{found_files.stdout_lines |regex_replace(',', '\n')}}\",\"{{actual_value}}\""
+  when: found_files.stdout_lines | length > 0
+
+- name: CSV - Write information into .csv file if no output produced
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+    line: "{{task_name}},{{ host_ip }},{{drift_status}},{{ output }},\"{{actual_value}}\""
+  when: found_files.stdout_lines is not defined or found_files.stdout_lines == []

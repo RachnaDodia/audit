@@ -1,0 +1,52 @@
+---
+- name: Check status of services
+  systemd:
+    name: "{{ item }}"
+  register: service_status
+  loop: "{{ services_to_check }}"
+
+- set_fact:
+    active_services: "{{ service_status.results | selectattr('status.ActiveState', 'eq', 'active') | map(attribute='item') | list }}"
+
+- debug:
+    msg: "Active Services: {{ active_services }}"
+  when: active_services | length > 0
+
+- name: Set task name
+  set_fact:
+    task_name: "Unwanted servcies should be disabled"
+
+- name: Set drift status if drifted
+  set_fact:
+    drift_status: "Non-compliant"
+  when: active_services | length > 0
+
+- name: Set drift status if not drifted
+  set_fact:
+    drift_status: "Compliant"
+  when: active_services is not defined or active_services == []
+
+- name: Print the output if drift status is compliant
+  set_fact:
+    output: "All unwanted srvices are disabled"
+  when: active_services is not defined or active_services == []
+
+- name: Writing Actual Value
+  set_fact:
+    actual_value: "Below unwanted services should be disabled, Atd, Cups, Dns/bind/named, VNC, Xwindow, dhcpd "
+
+- name: Get host IP
+  set_fact:
+    host_ip: "{{ ansible_host | default(inventory_hostname) }}"
+
+- name: CSV - Write information into .csv file
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+    line: "{{task_name}},{{host_ip}},{{drift_status}},\"Below are the active services.\n{{active_services|regex_replace(',', '\n')}}\",\"{{actual_value|regex_replace(',', '\n')}}\""
+  when: active_services | length > 0
+
+- name: CSV - Write information into .csv file if no output produced
+  lineinfile:
+    dest: "/tmp/drift_analysis_{{ current_datetime }}.csv"
+    line: "{{task_name}},{{host_ip}},{{drift_status}},{{ output }},\"{{actual_value|regex_replace(',', '\n')}}\""
+  when: active_services is not defined or active_services == []
